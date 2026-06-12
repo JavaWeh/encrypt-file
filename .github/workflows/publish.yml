@@ -1,6 +1,9 @@
 name: Publish Maven Package
 
 on:
+  push:
+    tags:
+      - "v*"
   release:
     types: [published]
   workflow_dispatch:
