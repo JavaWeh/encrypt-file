@@ -30,6 +30,9 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
       - name: Publish to GitHub Packages
         run: ./mvnw -B -ntp deploy
         env:
