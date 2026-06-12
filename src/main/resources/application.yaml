@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: encrypt-file
+
+# Example only. Production projects should inject LCZY_CRYPTO_KEY_BASE64
+# from environment variables, KMS, a secret manager, or a database-backed
+# ResourceKeyProvider bean instead of committing secrets to source control.
+# lczy:
+#   crypto:
+#     key-base64: ${LCZY_CRYPTO_KEY_BASE64:}
+#     key-id: ${LCZY_CRYPTO_KEY_ID:}
