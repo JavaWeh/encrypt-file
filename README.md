@@ -29,6 +29,47 @@
 
 当前版本：`0.0.2`
 
+### 从 GitHub Packages 引入
+
+GitHub Packages Maven Registry 需要先在消费方项目中声明仓库：
+
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <name>GitHub Packages</name>
+        <url>https://maven.pkg.github.com/javaweh/encrypt-file</url>
+    </repository>
+</repositories>
+```
+
+然后引入依赖：
+
+```xml
+<dependency>
+    <groupId>com.ljzy</groupId>
+    <artifactId>encrypt-file</artifactId>
+    <version>0.0.2</version>
+</dependency>
+```
+
+GitHub Packages 不是 Maven Central。其他项目下载依赖时，需要在 Maven `settings.xml` 中配置
+拥有 `read:packages` 权限的 GitHub Token：
+
+```xml
+<settings>
+    <servers>
+        <server>
+            <id>github</id>
+            <username>YOUR_GITHUB_USERNAME</username>
+            <password>YOUR_GITHUB_TOKEN</password>
+        </server>
+    </servers>
+</settings>
+```
+
+### 本地安装
+
 本地构建并安装到 Maven 本地仓库：
 
 ```bash
@@ -41,21 +82,29 @@ Windows PowerShell：
 .\mvnw.cmd clean install
 ```
 
-在其他项目中引用：
-
-```xml
-<dependency>
-    <groupId>com.ljzy</groupId>
-    <artifactId>encrypt-file</artifactId>
-    <version>0.0.2</version>
-</dependency>
-```
-
 如果希望把依赖下载到项目内 `.m2repo`，可以执行：
 
 ```bash
 ./mvnw -Dmaven.repo.local=.m2repo clean install
 ```
+
+### 发布到 GitHub Packages
+
+项目已配置 GitHub Actions：发布 GitHub Release，或在 Actions 页面手动运行
+`Publish Maven Package` 工作流，会执行：
+
+```bash
+./mvnw -B -ntp deploy
+```
+
+工作流使用仓库内置的 `GITHUB_TOKEN` 发布到：
+
+```text
+https://maven.pkg.github.com/javaweh/encrypt-file
+```
+
+发布新版本前，请先修改 `pom.xml` 中的 `<version>`，并确保 GitHub 仓库的
+Actions 权限允许写入 Packages。
 
 ## 快速开始
 

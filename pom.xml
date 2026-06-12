@@ -15,7 +15,11 @@
     <description>LCZY resource encryption toolkit</description>
     <url>https://github.com/JavaWeh/encrypt-file</url>
     <licenses>
-        <license/>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
     </licenses>
     <developers>
         <developer>
@@ -26,9 +30,16 @@
     <scm>
         <connection>scm:git:https://github.com/JavaWeh/encrypt-file.git</connection>
         <developerConnection>scm:git:git@github.com:JavaWeh/encrypt-file.git</developerConnection>
-        <tag/>
+        <tag>HEAD</tag>
         <url>https://github.com/JavaWeh/encrypt-file</url>
     </scm>
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/javaweh/encrypt-file</url>
+        </repository>
+    </distributionManagement>
     <properties>
         <java.version>17</java.version>
     </properties>
