@@ -174,11 +174,13 @@ class LczyResourceServiceTests {
                 "first.bin", first,
                 "second.bin", second
         )));
+        LczyEntry target = service.readManifest(lczy).requireEntry("second.bin");
         CountingRangeSource rangeSource = new CountingRangeSource(lczy);
         LczyReader reader = new LczyReader(rangeSource, serviceKeyProvider());
 
         assertThat(reader.readFile("second.bin")).isEqualTo(second);
         assertThat(rangeSource.requests()).isGreaterThanOrEqualTo(6);
+        assertThat(rangeSource.maxReadLength()).isLessThan(target.encryptedSize());
         assertThat(rangeSource.bytesRead()).isLessThan(lczy.length);
     }
 
@@ -240,6 +242,7 @@ class LczyResourceServiceTests {
         private final byte[] bytes;
         private int requests;
         private long bytesRead;
+        private int maxReadLength;
 
         private CountingRangeSource(byte[] bytes) {
             this.bytes = bytes;
@@ -254,6 +257,7 @@ class LczyResourceServiceTests {
         public byte[] read(long position, int length) throws IOException {
             requests++;
             bytesRead += length;
+            maxReadLength = Math.max(maxReadLength, length);
             return Arrays.copyOfRange(bytes, Math.toIntExact(position), Math.toIntExact(position) + length);
         }
 
@@ -263,6 +267,10 @@ class LczyResourceServiceTests {
 
         long bytesRead() {
             return bytesRead;
+        }
+
+        int maxReadLength() {
+            return maxReadLength;
         }
     }
 

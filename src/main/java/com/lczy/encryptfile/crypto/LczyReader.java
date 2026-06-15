@@ -7,14 +7,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.security.GeneralSecurityException;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 
 /**
@@ -84,15 +87,19 @@ public class LczyReader {
         try {
             // 根据 manifest 中的相对 offset 定位单个加密块，不需要顺序扫描整个 LCZY 文件。
             long blockPosition = header.fileDataStart() + entry.offset();
-            byte[] encrypted = source.read(blockPosition, entry.encryptedSize());
             SecretKey key = keyProvider.getKey(header.metadata().keyId());
-            byte[] compressedOrStored = LczyCrypto.decrypt(encrypted, key, entry.iv(), header.algorithm());
             MessageDigest digest = LczyDigest.sha256();
             DigestOutputStream digestOutput = new DigestOutputStream(output, digest);
-            if (storedWithoutCompression(entry)) {
-                digestOutput.write(compressedOrStored);
-            } else {
-                LczyCompression.inflate(new ByteArrayInputStream(compressedOrStored), digestOutput);
+            try (InputStream encryptedInput = source.openStream(blockPosition, entry.encryptedSize());
+                 InputStream plainInput = new DecryptingInputStream(
+                         encryptedInput,
+                         LczyCrypto.decryptCipher(key, entry.iv(), header.algorithm())
+                 )) {
+                if (storedWithoutCompression(entry)) {
+                    plainInput.transferTo(digestOutput);
+                } else {
+                    LczyCompression.inflate(plainInput, digestOutput);
+                }
             }
             LczyDigest.verify(entry.sha256(), digest, entry.path());
         } catch (IOException ex) {
@@ -198,6 +205,86 @@ public class LczyReader {
     }
 
     private record Footer(long indexOffset, int indexCipherLength) {
+    }
+
+    private static final class DecryptingInputStream extends InputStream {
+
+        private static final byte[] EMPTY = new byte[0];
+
+        private final InputStream input;
+        private final Cipher cipher;
+        private final byte[] encryptedBuffer = new byte[LczyRangeSource.DEFAULT_RANGE_CHUNK_SIZE];
+        private byte[] plainBuffer = EMPTY;
+        private int plainOffset;
+        private boolean finalBlockRead;
+
+        private DecryptingInputStream(InputStream input, Cipher cipher) {
+            this.input = input;
+            this.cipher = cipher;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            int read = read(one, 0, 1);
+            return read == -1 ? -1 : one[0] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            if (buffer == null) {
+                throw new NullPointerException("buffer");
+            }
+            if (offset < 0 || length < 0 || length > buffer.length - offset) {
+                throw new IndexOutOfBoundsException();
+            }
+            if (length == 0) {
+                return 0;
+            }
+            int total = 0;
+            while (length > 0) {
+                if (!ensurePlainBuffer()) {
+                    break;
+                }
+                int copied = Math.min(length, plainBuffer.length - plainOffset);
+                System.arraycopy(plainBuffer, plainOffset, buffer, offset, copied);
+                plainOffset += copied;
+                offset += copied;
+                length -= copied;
+                total += copied;
+            }
+            return total == 0 ? -1 : total;
+        }
+
+        @Override
+        public void close() throws IOException {
+            input.close();
+        }
+
+        private boolean ensurePlainBuffer() throws IOException {
+            while (plainOffset == plainBuffer.length) {
+                if (finalBlockRead) {
+                    return false;
+                }
+                int read = input.read(encryptedBuffer);
+                try {
+                    if (read == -1) {
+                        finalBlockRead = true;
+                        plainBuffer = bytesOrEmpty(cipher.doFinal());
+                    } else {
+                        plainBuffer = bytesOrEmpty(cipher.update(encryptedBuffer, 0, read));
+                    }
+                } catch (GeneralSecurityException ex) {
+                    throw new IOException("LCZY AES-GCM decrypt stream failed", ex);
+                }
+                plainOffset = 0;
+            }
+            return true;
+        }
+
+        private byte[] bytesOrEmpty(byte[] bytes) {
+            return bytes == null ? EMPTY : bytes;
+        }
     }
 
     private static final Set<String> FAST_STORE_EXTENSIONS = Set.of(
